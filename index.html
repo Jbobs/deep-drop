@@ -108,15 +108,15 @@
         }
         .hidden { display: none !important; }
         .overlay h1 { font-size: 32px; color: #ffd700; margin-bottom: 5px; text-shadow: 3px 3px #000; letter-spacing: 2px; }
-        .overlay p { font-size: 12px; margin-bottom: 15px; color: #aaa; line-height: 1.5; }
+        .overlay p { font-size: 12px; margin-bottom: 25px; color: #aaa; line-height: 1.5; }
         
-        /* モード選択ボタン */
-        .mode-menu { display: flex; flex-direction: column; gap: 12px; width: 85%; margin-bottom: 15px; }
-        .mode-btn { padding: 15px; font-size: 16px; font-weight: bold; border-radius: 6px; border: 2px solid #444; cursor: pointer; color: #fff; text-align: center; }
-        #btn-mode-single { background: #222; border-color: #ffd700; }
-        #btn-mode-single:active { background: #333; }
-        #btn-mode-multi { background: #222; border-color: #00e5ff; }
-        #btn-mode-multi:active { background: #333; }
+        /* モード選択メニュー */
+        .mode-menu { display: flex; flex-direction: column; gap: 15px; width: 85%; margin-bottom: 15px; }
+        .mode-btn { padding: 18px; font-size: 16px; font-weight: bold; border-radius: 8px; border: 2px solid #444; cursor: pointer; color: #fff; text-align: center; background: #222; transition: background 0.2s; }
+        #btn-mode-single { border-color: #ffd700; }
+        #btn-mode-single:active { background: #3c391b; }
+        #btn-mode-multi { border-color: #00e5ff; }
+        #btn-mode-multi:active { background: #16363d; }
 
         /* オンライン設定パネル */
         .online-panel { background: #1c1c1c; border: 2px solid #333; border-radius: 8px; padding: 12px; width: 90%; margin-bottom: 12px; text-align: left; }
@@ -128,19 +128,18 @@
         .status-text { font-size: 12px; color: #ff9900; font-weight: bold; margin-bottom: 10px; }
 
         /* メインアクション系ボタン */
-        .overlay button.main-action { padding: 12px 24px; font-size: 16px; background: #ffd700; color: #111; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 4px #b89b00; width: 80%; }
+        .overlay button.main-action { padding: 15px 24px; font-size: 16px; background: #ffd700; color: #111; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 4px #b89b00; width: 85%; margin-top: 10px; }
         .overlay button.main-action:disabled { background: #555; color: #888; box-shadow: none; cursor: not-allowed; }
-        .overlay button.btn-secondary { background: #444; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 13px; }
+        .overlay button.btn-secondary { background: #333; color: #ccc; border: 1px solid #444; border-radius: 6px; padding: 10px 20px; font-weight: bold; cursor: pointer; margin-top: 20px; font-size: 13px; width: 60%; }
 
         /* キャラクター選択 */
-        .char-selector-title { font-size: 11px; color: #ffd700; margin-bottom: 5px; font-weight: bold; letter-spacing: 1px; text-align: left; width: 90%; }
-        .char-scroll-box { display: flex; gap: 8px; width: 90%; overflow-x: auto; padding: 6px; background: #161616; border-radius: 6px; border: 1px solid #262626; margin-bottom: 15px; }
+        .char-selector-title { font-size: 11px; color: #ffd700; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; text-align: left; width: 90%; }
+        .char-scroll-box { display: flex; gap: 8px; width: 90%; overflow-x: auto; padding: 8px; background: #161616; border-radius: 6px; border: 1px solid #262626; margin-bottom: 15px; }
         .char-card { flex: 0 0 100px; padding: 8px 4px; border: 2px solid #333; background: #222; border-radius: 6px; cursor: pointer; text-align: center; }
         .char-card.selected { border-color: #ffd700; background: #2c2a1c; }
         .char-card.locked { opacity: 0.25; cursor: not-allowed; }
         .char-dot { font-size: 18px; margin-bottom: 2px; line-height: 1; }
         .char-name { font-size: 10px; font-weight: bold; color: #fff; }
-        .char-ability { font-size: 8px; color: #aaa; }
 
         #crown-badge { position: relative; font-size: 28px; margin-bottom: 5px; display: inline-block; }
         #crown-count { position: absolute; top: -5px; right: -10px; background: #ff2222; color: white; font-size: 10px; font-weight: bold; padding: 1px 4px; border-radius: 10px; border: 1px solid white; }
@@ -172,22 +171,22 @@
         <h1>DEEP DROP</h1>
         <p>正解ルートを掘り進み、300mの最深部を目指せ！</p>
         
-        <!-- モード選択ボタン -->
+        <!-- モード選択ボタン（最初はこれだけが見えるべき） -->
         <div class="mode-menu" id="mode-selection-group">
             <div class="mode-btn" id="btn-mode-single">🚶 1人プレイではじめる</div>
             <div class="mode-btn" id="btn-mode-multi">👥 2人オンライン通信プレイ</div>
         </div>
 
-        <!-- 1人プレイ用設定エリア -->
-        <div id="single-setup-area" class="hidden" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+        <!-- 1人プレイ用設定エリア (初期状態はhiddenで隠す) -->
+        <div id="single-setup-area" class="hidden" style="width:100%; flex-direction:column; align-items:center;">
             <div class="char-selector-title">EXPLORER SELECT (深度報酬で解放)</div>
             <div class="char-scroll-box" id="char-container"></div>
             <button id="start-single-btn" class="main-action">START SINGLE GAME</button>
             <button class="btn-secondary back-to-menu-btn">◀ モード選択に戻る</button>
         </div>
 
-        <!-- 2人プレイ用設定エリア -->
-        <div id="multi-setup-area" class="hidden" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+        <!-- 2人プレイ用設定エリア (初期状態はhiddenで隠す) -->
+        <div id="multi-setup-area" class="hidden" style="width:100%; flex-direction:column; align-items:center;">
             <div class="online-panel">
                 <div class="online-title">① 自分の接続ID (相手に送る)</div>
                 <div class="id-display">
@@ -251,7 +250,7 @@ let clearCount = parseInt(localStorage.getItem('deepDrop_clears_v13')) || 0;
 let highScore = parseInt(localStorage.getItem('deepDrop_high_v13')) || 0;
 
 // モード状態管理
-let currentMode = 'SINGLE'; // 'SINGLE' or 'MULTI'
+let currentMode = 'SINGLE'; 
 let peer = null, conn = null;
 let isHost = false;
 let syncSeed = 0;
@@ -265,7 +264,7 @@ let gameState = 'START';
 let keys = {};
 let mobileLeftPressed = false, mobileRightPressed = false;
 
-// BGMシステム
+// BGM
 let audioCtx = null, bgmInterval = null;
 const melody = [440, 494, 523, 587, 523, 494, 392, 440, 0, 349, 392, 440, 392, 349, 293, 330];
 let melodyIdx = 0;
@@ -358,7 +357,6 @@ function initMap() {
     generatedMaxY = 10;
     extendMap(120);
 
-    // ポジションリセット
     p1.subX = (currentMode === 'SINGLE' ? 10 : 8) * TILE_SIZE + 3; p1.subY = 2 * TILE_SIZE; p1.dead = false; p1.stuckTimer = 0; p1.deathAnimFrame = 0; p1.flashlightTimer = 0;
     p2.subX = 12 * TILE_SIZE + 3; p2.subY = 2 * TILE_SIZE; p2.dead = false; p2.stuckTimer = 0; p2.deathAnimFrame = 0; p2.flashlightTimer = 0;
 }
@@ -427,9 +425,7 @@ function getBiomeColor(y) {
 function update() {
     if (gameState !== 'PLAYING') return;
 
-    // 操作対象の決定
     let me = (currentMode === 'SINGLE' || isHost) ? p1 : p2;
-
     me.x = Math.floor((me.subX + me.width / 2) / TILE_SIZE);
     me.y = Math.floor((me.subY + TILE_SIZE / 2) / TILE_SIZE);
 
@@ -441,10 +437,8 @@ function update() {
     let cameraY = maxPlayerY - canvas.height / 3;
     if (cameraY < 0) cameraY = 0;
 
-    // マルチ時：置いてけぼりデス
     if (currentMode === 'MULTI' && me.subY < cameraY - 20) me.dead = true;
 
-    // 床・物理判定
     let nextGridY = Math.floor((me.subY + TILE_SIZE) / TILE_SIZE);
     let standOnFloor = false;
     let pLeftX = Math.floor(me.subX / TILE_SIZE), pRightX = Math.floor((me.subX + me.width) / TILE_SIZE);
@@ -456,7 +450,6 @@ function update() {
     if (!standOnFloor) { me.isFalling = true; me.subY += 6.5; } 
     else { me.isFalling = false; me.subY = Math.floor(me.subY / TILE_SIZE) * TILE_SIZE; }
 
-    // 移動
     let moveDir = 0;
     if (keys['ArrowLeft'] || keys['a'] || mobileLeftPressed) moveDir = -1;
     if (keys['ArrowRight'] || keys['d'] || mobileRightPressed) moveDir = 1;
@@ -480,7 +473,6 @@ function update() {
         }
     }
 
-    // アイテム・ゴール判定
     items.forEach(item => {
         if (item.active && item.y === me.y && item.x === me.x) {
             if (item.type === 'flashlight') { item.active = false; me.flashlightTimer = 300; }
@@ -499,7 +491,6 @@ function update() {
     let displayDepth = Math.min(300, currentDepth);
     document.getElementById('ui-depth').innerText = displayDepth;
 
-    // 詰み判定
     let isStuck = false;
     if (!me.isFalling && me.y !== 199 && me.y !== 200 && me.y < 598 && !me.dead) {
         let currentY = Math.floor(me.subY / TILE_SIZE), currentX = Math.floor((me.subX + me.width / 2) / TILE_SIZE);
@@ -520,7 +511,6 @@ function update() {
         me.stuckTimer = 0; document.getElementById('danger-indicator').classList.add('hidden');
     }
 
-    // デス・ゲームオーバー処理
     if (currentMode === 'SINGLE') {
         if (p1.dead) {
             if (p1.deathAnimFrame < 40) p1.deathAnimFrame++;
@@ -577,7 +567,6 @@ function draw() {
         }
     });
 
-    // プレイヤー描画
     let activeChar = CHARACTERS.find(c => c.id === activeCharId) || CHARACTERS[0];
     let p1Color = currentMode === 'SINGLE' ? activeChar.color : '#00e5ff';
     drawPlayerObj(p1, p1Color, currentMode === 'SINGLE' ? '' : '1P');
@@ -585,7 +574,6 @@ function draw() {
 
     ctx.restore();
 
-    // 視野ライトの計算
     let lightX = currentMode === 'SINGLE' ? (p1.subX + p1.width/2) : (p1.subX + p2.subX)/2 + TILE_SIZE/4;
     let lightY = (currentMode === 'SINGLE' ? p1.subY + TILE_SIZE/2 : (p1.subY + p2.subY)/2 + TILE_SIZE/2) - cameraY;
     
@@ -609,7 +597,7 @@ function drawPlayerObj(pObj, color, label) {
         ctx.scale(1 + progress * 0.6, 1 - progress * 0.95); ctx.globalAlpha = 1 - progress;
     }
     ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, TILE_SIZE/2 - 2, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#111"; ctx.fillRect(-3, -3, 2, 4); ctx.fillRect(1, -3, 2, 4); // 目
+    ctx.fillStyle = "#111"; ctx.fillRect(-3, -3, 2, 4); ctx.fillRect(1, -3, 2, 4); 
     if (label) { ctx.fillStyle = color; ctx.font = '9px monospace'; ctx.textAlign = 'center'; ctx.fillText(label, 0, -12); }
     ctx.restore();
 }
@@ -640,20 +628,28 @@ function startGame(mode) {
 
 function loop() { update(); draw(); if (gameState === 'PLAYING') requestAnimationFrame(loop); }
 
-// UI切り替えイベント
+// UI切り替えイベントの連動
 document.getElementById('btn-mode-single').addEventListener('click', () => {
     document.getElementById('mode-selection-group').classList.add('hidden');
-    document.getElementById('single-setup-area').classList.remove('hidden');
+    let target = document.getElementById('single-setup-area');
+    target.classList.remove('hidden');
+    target.style.display = 'flex'; // フレックス配置を強制
 });
+
 document.getElementById('btn-mode-multi').addEventListener('click', () => {
     document.getElementById('mode-selection-group').classList.add('hidden');
-    document.getElementById('multi-setup-area').classList.remove('hidden');
+    let target = document.getElementById('multi-setup-area');
+    target.classList.remove('hidden');
+    target.style.display = 'flex'; // フレックス配置を強制
     initPeer();
 });
+
 document.querySelectorAll('.back-to-menu-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.getElementById('single-setup-area').classList.add('hidden');
+        document.getElementById('single-setup-area').style.display = 'none';
         document.getElementById('multi-setup-area').classList.add('hidden');
+        document.getElementById('multi-setup-area').style.display = 'none';
         document.getElementById('mode-selection-group').classList.remove('hidden');
     });
 });
@@ -668,7 +664,9 @@ document.getElementById('restart-button').addEventListener('click', () => {
 document.querySelectorAll('#home-button, #clear-home-button').forEach(btn => {
     btn.addEventListener('click', () => {
         gameState = 'START'; document.getElementById('screen-gameover').classList.add('hidden'); document.getElementById('screen-clear').classList.add('hidden'); document.getElementById('screen-start').classList.remove('hidden');
-        document.getElementById('single-setup-area').classList.add('hidden'); document.getElementById('multi-setup-area').classList.add('hidden'); document.getElementById('mode-selection-group').classList.remove('hidden');
+        document.getElementById('single-setup-area').classList.add('hidden'); document.getElementById('single-setup-area').style.display = 'none';
+        document.getElementById('multi-setup-area').classList.add('hidden'); document.getElementById('multi-setup-area').style.display = 'none';
+        document.getElementById('mode-selection-group').classList.remove('hidden');
         renderCharacterSelector(); draw();
     });
 });
@@ -680,7 +678,6 @@ window.addEventListener('resize', resizeCanvas);
 window.addEventListener('keydown', e => { keys[e.key] = true; });
 window.addEventListener('keyup', e => keys[e.key] = false);
 
-// モバイル操作
 const handleMobile = (id, press) => { document.getElementById(id).addEventListener('touchstart', (e) => { e.preventDefault(); if (id==='btn-left') mobileLeftPressed=press; else mobileRightPressed=press; }); document.getElementById(id).addEventListener('touchend', () => { if (id==='btn-left') mobileLeftPressed=false; else mobileRightPressed=false; }); };
 handleMobile('btn-left', true); handleMobile('btn-right', true);
 
