@@ -298,9 +298,9 @@ const CHARACTERS = [
     { id: 'rainbow', name: 'プリズム', color: '#ffffff', req: 300, scale: 1.6 }
 ];
 
-let activeCharId = localStorage.getItem('deepDrop_activeChar_v11') || 'yellow';
-let clearCount = parseInt(localStorage.getItem('deepDrop_clears_v11')) || 0;
-let highScore = parseInt(localStorage.getItem('deepDrop_high_v11')) || 0;
+let activeCharId = localStorage.getItem('deepDrop_activeChar_v12') || 'yellow';
+let clearCount = parseInt(localStorage.getItem('deepDrop_clears_v12')) || 0;
+let highScore = parseInt(localStorage.getItem('deepDrop_high_v12')) || 0;
 
 let player = {
     x: 10, y: 2,            
@@ -310,12 +310,46 @@ let player = {
     isFalling: false,
     stuckTimer: 0,          
     maxDepth: 0,
-    flashlightTimer: 0 
+    flashlightTimer: 0,
+    deathAnimFrame: 0 // 演出用フレーム
 };
 
 document.getElementById('ui-high').innerText = highScore;
 let gameState = 'START'; 
 let keys = {};
+
+// BGM生成システム (Web Audio API)
+let audioCtx = null;
+let bgmInterval = null;
+const melody = [440, 494, 523, 587, 523, 494, 392, 440, 0, 349, 392, 440, 392, 349, 293, 330];
+let melodyIdx = 0;
+
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // レトロなゲームボーイ・ファミコン風メロディの定期実行
+    bgmInterval = setInterval(() => {
+        if (gameState !== 'PLAYING' || !audioCtx) return;
+        let freq = melody[melodyIdx % melody.length];
+        melodyIdx++;
+        if (freq === 0) return;
+
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        
+        osc.type = 'triangle'; // 洞窟に合う少しこもったレトロサウンド
+        osc.frequency.setValueAtTime(freq / 2, audioCtx.currentTime); // 1オクターブ下げて不気味さを演出
+        
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    }, 220);
+}
 
 const BIOMES = [
     { name: "上層洞窟", color: { r: 55, g: 65, b: 80 } },     
@@ -331,6 +365,7 @@ function initMap() {
     player.maxDepth = 0;
     player.stuckTimer = 0;
     player.flashlightTimer = 0;
+    player.deathAnimFrame = 0;
     truePathX = 10; 
     
     for (let y = 0; y < 10; y++) {
@@ -351,11 +386,11 @@ function extendMap(targetRows) {
     while (generatedMaxY < targetRows) {
         let y = generatedMaxY;
         
-        // 100m中継フロア
         if (y === 200) {
             map[y] = new Array(COLS).fill(1);
             truePathX = 10;
-            map[y][truePathX] = 0; 
+            map[y][truePathX] = 0;
+            map[y][truePathX+1] = 0; // 2マス幅を維持
             generatedMaxY++;
             continue;
         }
@@ -365,7 +400,6 @@ function extendMap(targetRows) {
             continue;
         }
 
-        // 300mゴール
         if (y === 600) {
             map[y] = new Array(COLS).fill(1);
             map[y-1] = new Array(COLS).fill(0);
@@ -384,28 +418,29 @@ function extendMap(targetRows) {
             // 【床層】
             map[y] = new Array(COLS).fill(1); 
             
-            // 次の床の穴の位置を決める（左右に最大2マスまでドリフト）
-            let nextPathX = Math.max(1, Math.min(COLS - 2, truePathX + (Math.floor(Math.random() * 5) - 2)));
+            // 2マス幅で確実に通れるようにターゲットを決定
+            let nextPathX = Math.max(1, Math.min(COLS - 3, truePathX + (Math.floor(Math.random() * 5) - 2)));
             
-            // 現在の床の穴を開ける
+            // 現在の床の穴を「2マス幅」で開ける
             map[y][truePathX] = 0;
+            map[y][truePathX + 1] = 0;
             
-            // 【超重要】次の行（通路層）の歩行空間を「先に」完全開通・保護する
+            // 【通路層】の歩行空間を「2マス幅」で完全保護
             if (!map[y+1]) map[y+1] = new Array(COLS).fill(0);
             let startX = Math.min(truePathX, nextPathX);
-            let endX = Math.max(truePathX, nextPathX);
+            let endX = Math.max(truePathX + 1, nextPathX + 1);
             for (let x = startX; x <= endX; x++) {
-                map[y+1][x] = 9; // 9 = 絶対に壁を置かない「正解ルート保護スペース」
+                map[y+1][x] = 9; // 9 = 絶対保護
             }
             
-            // 次の床用にターゲットを更新
             truePathX = nextPathX;
 
-            // ダミーの穴（ゲーム性を出すための偽ルート）
-            let totalHoles = Math.floor(Math.random() * 2) + 3; 
+            // ダミーの穴
+            let totalHoles = Math.floor(Math.random() * 2) + 2; 
             for (let i = 0; i < totalHoles; i++) {
-                let fakeX = Math.floor(Math.random() * (COLS - 2)) + 1;
+                let fakeX = Math.floor(Math.random() * (COLS - 3)) + 1;
                 map[y][fakeX] = 0; 
+                map[y][fakeX + 1] = 0; 
             }
             
         } else {
@@ -413,23 +448,20 @@ function extendMap(targetRows) {
             if (!map[y]) map[y] = new Array(COLS).fill(0);
             
             if (y > 14) {
-                let wallChance = 0.35; 
+                let wallChance = 0.33; 
                 for (let x = 0; x < COLS; x++) {
-                    // 保護フラグ(9)が立っていない場所、かつ左右端以外にランダムで壁を配置
                     if (map[y][x] !== 9 && x > 0 && x < COLS - 1) {
                         if (Math.random() < wallChance) map[y][x] = 1;
                     }
                 }
             }
             
-            // 保護フラグを通常の空気(0)に戻す
             for (let x = 0; x < COLS; x++) {
                 if (map[y][x] === 9) map[y][x] = 0;
             }
 
-            // 【アイテム埋まり対策の決定版】確実に通れる正解ルート上に12%の確率で配置
+            // 確実に歩ける正解ルート上に配置
             if (y > 12 && Math.random() < 0.12) {
-                // その時点の正解位置（直前に決まったtruePathXの場所＝確実に歩ける空気マス）に置く
                 items.push({ x: truePathX, y: y, type: 'flashlight', active: true });
             }
         }
@@ -500,10 +532,21 @@ function update() {
         if (checkX < 0 || checkX >= COLS) collision = true;
         else if ((map[checkY1] && map[checkY1][checkX] === 1) || (map[checkY2] && map[checkY2][checkX] === 1)) collision = true;
 
-        if (!collision) player.subX = nextSubX;
+        if (!collision) {
+            player.subX = nextSubX;
+        } else {
+            // 【理不尽詰み防止】穴の手前の壁の角にドット単位でかすった時、自動でスムーズにすべり込ませる補正
+            if (moveDir === -1 && (player.subX % TILE_SIZE) < 6) {
+                let tileY = Math.floor((player.subY + TILE_SIZE / 2) / TILE_SIZE);
+                if (map[tileY] && map[tileY][checkX] === 0) player.subX = Math.floor(player.subX / TILE_SIZE) * TILE_SIZE;
+            }
+            if (moveDir === 1 && (player.subX % TILE_SIZE) > TILE_SIZE - player.width - 6) {
+                let tileY = Math.floor((player.subY + TILE_SIZE / 2) / TILE_SIZE);
+                if (map[tileY] && map[tileY][checkX] === 0) player.subX = Math.floor(player.subX / TILE_SIZE) * TILE_SIZE + (TILE_SIZE - player.width);
+            }
+        }
     }
 
-    // アイテム獲得処理
     items.forEach(item => {
         if (item.active && item.y === player.y && item.x === player.x) {
             if (item.type === 'flashlight') { item.active = false; player.flashlightTimer = 300; }
@@ -517,7 +560,6 @@ function update() {
         document.getElementById('ui-depth').innerText = player.maxDepth;
     }
 
-    // 行き止まり判定
     let isStuck = false;
     if (!player.isFalling && player.y !== 199 && player.y !== 200 && player.y < 598) {
         let currentY = Math.floor(player.subY / TILE_SIZE);
@@ -541,10 +583,30 @@ function update() {
     if (isStuck) {
         player.stuckTimer++;
         document.getElementById('danger-indicator').classList.remove('hidden');
-        if (player.stuckTimer > 70) endGame();
+        if (player.stuckTimer > 75) triggerDeathAnimation();
     } else {
         player.stuckTimer = 0;
         document.getElementById('danger-indicator').classList.add('hidden');
+    }
+}
+
+// 力尽きる演出のトリガー
+function triggerDeathAnimation() {
+    gameState = 'DEATH_ANIM';
+    player.deathAnimFrame = 0;
+    document.getElementById('danger-indicator').classList.add('hidden');
+    animateDeath();
+}
+
+function animateDeath() {
+    if (gameState !== 'DEATH_ANIM') return;
+    player.deathAnimFrame++;
+    draw();
+
+    if (player.deathAnimFrame < 40) {
+        requestAnimationFrame(animateDeath);
+    } else {
+        endGame();
     }
 }
 
@@ -641,31 +703,70 @@ function draw() {
         charColor = `hsl(${hue}, 100%, 65%)`;
     }
 
-    ctx.fillStyle = charColor;
-    ctx.shadowBlur = 12; ctx.shadowColor = charColor;
-    ctx.beginPath();
+    // プレイヤー描画位置の計算
     let charX = player.subX + player.width / 2;
     let charY = player.subY + TILE_SIZE / 2;
     let radius = TILE_SIZE / 2 - 2;
-    if (player.isFalling) ctx.ellipse(charX, charY, radius - 2, radius + 2, 0, 0, Math.PI * 2);
-    else ctx.arc(charX, charY, radius, 0, Math.PI * 2);
+
+    ctx.save();
+    ctx.translate(charX, charY);
+
+    // 【力尽きる演出用スケール】
+    let scaleX = 1;
+    let scaleY = 1;
+    let opacity = 1;
+
+    if (gameState === 'DEATH_ANIM' || gameState === 'GAMEOVER') {
+        let progress = Math.min(1, player.deathAnimFrame / 40);
+        scaleX = 1 + progress * 0.6;   // 横にへしゃげる
+        scaleY = 1 - progress * 0.95;  // 縦につぶれる
+        opacity = 1 - progress;        // スーッと消える
+    }
+
+    ctx.scale(scaleX, scaleY);
+    ctx.globalAlpha = opacity;
+
+    ctx.fillStyle = charColor;
+    ctx.shadowBlur = (gameState === 'PLAYING') ? 12 : 0; 
+    ctx.shadowColor = charColor;
+    ctx.beginPath();
+    
+    if (player.isFalling && gameState === 'PLAYING') {
+        ctx.ellipse(0, 0, radius - 2, radius + 2, 0, 0, Math.PI * 2);
+    } else {
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    }
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = "#111"; ctx.fillRect(charX - 3, charY - 3, 2, 4); ctx.fillRect(charX + 1, charY - 3, 2, 4);
-    ctx.strokeStyle = charColor; ctx.lineWidth = 2; ctx.beginPath();
-    ctx.moveTo(charX - 2, charY - radius); ctx.lineTo(charX - 4, charY - radius - 4);
-    ctx.moveTo(charX + 3, charY - radius); ctx.lineTo(charX + 5, charY - radius - 4);
+    // 目とアンテナの描画
+    ctx.fillStyle = "#111"; 
+    ctx.fillRect(-3, -3, 2, 4); 
+    ctx.fillRect(1, -3, 2, 4);
+    
+    ctx.strokeStyle = charColor; 
+    ctx.lineWidth = 2; 
+    ctx.beginPath();
+    ctx.moveTo(-2, -radius); ctx.lineTo(-4, -radius - 4);
+    ctx.moveTo(3, -radius); ctx.lineTo(5, -radius - 4);
     ctx.stroke();
 
-    ctx.restore();
+    ctx.restore(); // プレイヤー固有の座標系をリセット
+    ctx.restore(); // カメラ変換の復元
 
+    // 視界の光（マスクエフェクト）
     let screenPlayerY = player.subY + TILE_SIZE/2 - cameraY;
     let screenPlayerX = player.subX + player.width/2;
     let viewRadiusStart = TILE_SIZE * 1.5 * activeChar.scale;
     let viewRadiusEnd = TILE_SIZE * 6.5 * activeChar.scale;
 
     if (player.flashlightTimer > 0) { viewRadiusStart *= 1.25; viewRadiusEnd *= 1.25; }
+    if (gameState === 'DEATH_ANIM' || gameState === 'GAMEOVER') {
+        // 力尽きたら視界もゼロになる
+        let p = Math.min(1, player.deathAnimFrame / 40);
+        viewRadiusStart *= (1 - p);
+        viewRadiusEnd *= (1 - p);
+    }
 
     let gradient = ctx.createRadialGradient(screenPlayerX, screenPlayerY, viewRadiusStart, screenPlayerX, screenPlayerY, viewRadiusEnd);
     gradient.addColorStop(0, 'rgba(0,0,0,0)');
@@ -674,7 +775,7 @@ function draw() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    if (player.flashlightTimer > 0) {
+    if (player.flashlightTimer > 0 && gameState === 'PLAYING') {
         ctx.fillStyle = "rgba(0, 229, 255, 0.3)"; ctx.fillRect(15, 15, 100, 8);
         ctx.fillStyle = "#00e5ff"; ctx.fillRect(15, 15, (player.flashlightTimer / 300) * 100, 8);
     }
@@ -715,7 +816,7 @@ function renderCharacterSelector() {
             card.addEventListener('click', () => {
                 if (gameState === 'START') {
                     activeCharId = c.id;
-                    localStorage.setItem('deepDrop_activeChar_v11', activeCharId);
+                    localStorage.setItem('deepDrop_activeChar_v12', activeCharId);
                     renderCharacterSelector();
                     draw();
                 }
@@ -732,11 +833,15 @@ function resizeCanvas() {
 
 function loop() {
     update();
-    draw();
-    if (gameState === 'PLAYING') requestAnimationFrame(loop);
+    if (gameState === 'PLAYING') {
+        draw();
+        requestAnimationFrame(loop);
+    }
 }
 
 function startGame() {
+    initAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     initMap();
     gameState = 'PLAYING';
     document.getElementById('screen-start').classList.add('hidden');
@@ -752,7 +857,7 @@ function endGame() {
     let oldHighScore = highScore;
     if (player.maxDepth > highScore) {
         highScore = player.maxDepth;
-        localStorage.setItem('deepDrop_high_v11', highScore);
+        localStorage.setItem('deepDrop_high_v12', highScore);
         document.getElementById('ui-high').innerText = highScore;
     }
 
@@ -770,10 +875,10 @@ function endGame() {
 function clearGame() {
     gameState = 'CLEAR';
     clearCount++;
-    localStorage.setItem('deepDrop_clears_v11', clearCount);
+    localStorage.setItem('deepDrop_clears_v12', clearCount);
     if (highScore < 300) {
         highScore = 300;
-        localStorage.setItem('deepDrop_high_v11', 300);
+        localStorage.setItem('deepDrop_high_v12', 300);
         document.getElementById('ui-high').innerText = 300;
     }
     document.getElementById('screen-clear').classList.remove('hidden');
@@ -799,7 +904,14 @@ function returnToHome() {
     draw();
 }
 
+// ユーザーの何かしらの操作をフックにしてサウンドを有効化する
+function handleUserAction() {
+    initAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+
 window.addEventListener('keydown', e => {
+    handleUserAction();
     keys[e.key] = true;
     if (e.key === 'Enter') {
         if (gameState === 'START' || gameState === 'GAMEOVER') startGame();
@@ -811,14 +923,14 @@ window.addEventListener('keyup', e => keys[e.key] = false);
 let mobileLeftPressed = false;
 let mobileRightPressed = false;
 
-document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); mobileLeftPressed = true; });
+document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); handleUserAction(); mobileLeftPressed = true; });
 document.getElementById('btn-left').addEventListener('touchend', () => mobileLeftPressed = false);
-document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); mobileRightPressed = true; });
+document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); handleUserAction(); mobileRightPressed = true; });
 document.getElementById('btn-right').addEventListener('touchend', () => mobileRightPressed = false);
 
-document.getElementById('btn-left').addEventListener('mousedown', () => mobileLeftPressed = true);
+document.getElementById('btn-left').addEventListener('mousedown', () => { handleUserAction(); mobileLeftPressed = true; });
 document.getElementById('btn-left').addEventListener('mouseup', () => mobileLeftPressed = false);
-document.getElementById('btn-right').addEventListener('mousedown', () => mobileRightPressed = true);
+document.getElementById('btn-right').addEventListener('mousedown', () => { handleUserAction(); mobileRightPressed = true; });
 document.getElementById('btn-mouseup', () => mobileRightPressed = false);
 
 document.getElementById('start-button').addEventListener('click', startGame);
