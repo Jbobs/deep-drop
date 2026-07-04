@@ -298,9 +298,9 @@ const CHARACTERS = [
     { id: 'rainbow', name: 'プリズム', color: '#ffffff', req: 300, scale: 1.6 }
 ];
 
-let activeCharId = localStorage.getItem('deepDrop_activeChar_v10') || 'yellow';
-let clearCount = parseInt(localStorage.getItem('deepDrop_clears_v10')) || 0;
-let highScore = parseInt(localStorage.getItem('deepDrop_high_v10')) || 0;
+let activeCharId = localStorage.getItem('deepDrop_activeChar_v11') || 'yellow';
+let clearCount = parseInt(localStorage.getItem('deepDrop_clears_v11')) || 0;
+let highScore = parseInt(localStorage.getItem('deepDrop_high_v11')) || 0;
 
 let player = {
     x: 10, y: 2,            
@@ -351,7 +351,7 @@ function extendMap(targetRows) {
     while (generatedMaxY < targetRows) {
         let y = generatedMaxY;
         
-        // 100m中継フロアのスタック防止対策
+        // 100m中継フロア
         if (y === 200) {
             map[y] = new Array(COLS).fill(1);
             truePathX = 10;
@@ -365,10 +365,9 @@ function extendMap(targetRows) {
             continue;
         }
 
-        // 300mゴールの完全保護
+        // 300mゴール
         if (y === 600) {
             map[y] = new Array(COLS).fill(1);
-            map[y][10] = 1; 
             map[y-1] = new Array(COLS).fill(0);
             items.push({ x: 10, y: y - 1, type: 'chest', active: true });
             generatedMaxY = 601;
@@ -382,54 +381,56 @@ function extendMap(targetRows) {
         }
 
         if (y % 2 === 0) {
-            // 【ルート絶対保証】正解となる穴のX座標を決める
+            // 【床層】
             map[y] = new Array(COLS).fill(1); 
-            let drift = Math.floor(Math.random() * 5) - 2; 
-            truePathX = Math.max(1, Math.min(COLS - 2, truePathX + drift));
-            map[y][truePathX] = 0; // 正解の穴を開ける
-
-            // ダミーの穴を追加
-            let totalHoles = Math.floor(Math.random() * 2) + 4; 
-            for (let i = 0; i < totalHoles; i++) {
-                let fakeX = Math.floor(Math.random() * (COLS - 2)) + 1;
-                if (fakeX !== truePathX) map[y][fakeX] = 0; 
+            
+            // 次の床の穴の位置を決める（左右に最大2マスまでドリフト）
+            let nextPathX = Math.max(1, Math.min(COLS - 2, truePathX + (Math.floor(Math.random() * 5) - 2)));
+            
+            // 現在の床の穴を開ける
+            map[y][truePathX] = 0;
+            
+            // 【超重要】次の行（通路層）の歩行空間を「先に」完全開通・保護する
+            if (!map[y+1]) map[y+1] = new Array(COLS).fill(0);
+            let startX = Math.min(truePathX, nextPathX);
+            let endX = Math.max(truePathX, nextPathX);
+            for (let x = startX; x <= endX; x++) {
+                map[y+1][x] = 9; // 9 = 絶対に壁を置かない「正解ルート保護スペース」
             }
             
-            // 【アイテム埋まり対策】岩がない空気マスを厳選してアイテムを配置
-            if (y > 12 && Math.random() < 0.12) {
-                let validX = [];
-                for (let x = 1; x < COLS - 1; x++) {
-                    // 床の穴の上、またはその直上が壁ではないスペースを探す
-                    if (map[y][x] === 0) {
-                        validX.push(x);
-                    }
-                }
-                if (validX.length > 0) {
-                    let chosenX = validX[Math.floor(Math.random() * validX.length)];
-                    items.push({ x: chosenX, y: y - 1, type: 'flashlight', active: true });
-                }
+            // 次の床用にターゲットを更新
+            truePathX = nextPathX;
+
+            // ダミーの穴（ゲーム性を出すための偽ルート）
+            let totalHoles = Math.floor(Math.random() * 2) + 3; 
+            for (let i = 0; i < totalHoles; i++) {
+                let fakeX = Math.floor(Math.random() * (COLS - 2)) + 1;
+                map[y][fakeX] = 0; 
             }
             
         } else {
-            // 通路層の生成
-            map[y] = new Array(COLS).fill(0);
+            // 【通路層】
+            if (!map[y]) map[y] = new Array(COLS).fill(0);
+            
             if (y > 14) {
-                let wallChance = 0.32; 
+                let wallChance = 0.35; 
                 for (let x = 0; x < COLS; x++) {
-                    if (Math.random() < wallChance) map[y][x] = 1;
-                }
-                
-                // 【通路層のルート保証】正解ルートの真下とその周囲に絶対岩を置かない
-                if (map[y - 1]) {
-                    if (map[y][truePathX] === 1) map[y][truePathX] = 0; 
-                    if (truePathX > 0 && map[y][truePathX - 1] === 1) map[y][truePathX - 1] = 0;
-                    if (truePathX < COLS - 1 && map[y][truePathX + 1] === 1) map[y][truePathX + 1] = 0;
-
-                    // 孤立した落とし穴（下に岩があって詰む場所）を自動救済
-                    for(let x = 0; x < COLS; x++) {
-                        if (map[y - 1][x] === 0 && map[y][x] === 1) map[y][x] = 0;
+                    // 保護フラグ(9)が立っていない場所、かつ左右端以外にランダムで壁を配置
+                    if (map[y][x] !== 9 && x > 0 && x < COLS - 1) {
+                        if (Math.random() < wallChance) map[y][x] = 1;
                     }
                 }
+            }
+            
+            // 保護フラグを通常の空気(0)に戻す
+            for (let x = 0; x < COLS; x++) {
+                if (map[y][x] === 9) map[y][x] = 0;
+            }
+
+            // 【アイテム埋まり対策の決定版】確実に通れる正解ルート上に12%の確率で配置
+            if (y > 12 && Math.random() < 0.12) {
+                // その時点の正解位置（直前に決まったtruePathXの場所＝確実に歩ける空気マス）に置く
+                items.push({ x: truePathX, y: y, type: 'flashlight', active: true });
             }
         }
         generatedMaxY++;
@@ -502,7 +503,7 @@ function update() {
         if (!collision) player.subX = nextSubX;
     }
 
-    // アイテム獲得処理（岩に埋まらない前提なので位置の完全一致で確実に拾えます）
+    // アイテム獲得処理
     items.forEach(item => {
         if (item.active && item.y === player.y && item.x === player.x) {
             if (item.type === 'flashlight') { item.active = false; player.flashlightTimer = 300; }
@@ -714,7 +715,7 @@ function renderCharacterSelector() {
             card.addEventListener('click', () => {
                 if (gameState === 'START') {
                     activeCharId = c.id;
-                    localStorage.setItem('deepDrop_activeChar_v10', activeCharId);
+                    localStorage.setItem('deepDrop_activeChar_v11', activeCharId);
                     renderCharacterSelector();
                     draw();
                 }
@@ -751,7 +752,7 @@ function endGame() {
     let oldHighScore = highScore;
     if (player.maxDepth > highScore) {
         highScore = player.maxDepth;
-        localStorage.setItem('deepDrop_high_v10', highScore);
+        localStorage.setItem('deepDrop_high_v11', highScore);
         document.getElementById('ui-high').innerText = highScore;
     }
 
@@ -769,10 +770,10 @@ function endGame() {
 function clearGame() {
     gameState = 'CLEAR';
     clearCount++;
-    localStorage.setItem('deepDrop_clears_v10', clearCount);
+    localStorage.setItem('deepDrop_clears_v11', clearCount);
     if (highScore < 300) {
         highScore = 300;
-        localStorage.setItem('deepDrop_high_v10', 300);
+        localStorage.setItem('deepDrop_high_v11', 300);
         document.getElementById('ui-high').innerText = 300;
     }
     document.getElementById('screen-clear').classList.remove('hidden');
