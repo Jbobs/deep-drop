@@ -351,17 +351,15 @@ function extendMap(targetRows) {
     while (generatedMaxY < targetRows) {
         let y = generatedMaxY;
         
-        // --- 【バグ修正】100m中継フロアのスタック防止対策 ---
+        // 100m中継フロアのスタック防止対策
         if (y === 200) {
-            map[y] = new Array(COLS).fill(1); // 全体に床を敷く
-            // 中央付近(10マス目)を次の階層へ進む「確定の脱出穴」として空ける
+            map[y] = new Array(COLS).fill(1);
             truePathX = 10;
             map[y][truePathX] = 0; 
             generatedMaxY++;
             continue;
         }
         if (y === 199) {
-            // 100m直前が壁で埋まらないように空気にするが、プレイヤーを誘導するため仕切り壁はなし
             map[y] = new Array(COLS).fill(0);
             generatedMaxY++;
             continue;
@@ -384,36 +382,50 @@ function extendMap(targetRows) {
         }
 
         if (y % 2 === 0) {
+            // 【ルート絶対保証】正解となる穴のX座標を決める
             map[y] = new Array(COLS).fill(1); 
             let drift = Math.floor(Math.random() * 5) - 2; 
             truePathX = Math.max(1, Math.min(COLS - 2, truePathX + drift));
-            map[y][truePathX] = 0; 
+            map[y][truePathX] = 0; // 正解の穴を開ける
 
+            // ダミーの穴を追加
             let totalHoles = Math.floor(Math.random() * 2) + 4; 
             for (let i = 0; i < totalHoles; i++) {
                 let fakeX = Math.floor(Math.random() * (COLS - 2)) + 1;
                 if (fakeX !== truePathX) map[y][fakeX] = 0; 
             }
             
+            // 【アイテム埋まり対策】岩がない空気マスを厳選してアイテムを配置
             if (y > 12 && Math.random() < 0.12) {
-                let itemX = truePathX;
-                if (Math.random() < 0.5 && truePathX > 0) itemX = truePathX - 1;
-                else if (truePathX < COLS - 1) itemX = truePathX + 1;
-                items.push({ x: itemX, y: y - 1, type: 'flashlight', active: true });
+                let validX = [];
+                for (let x = 1; x < COLS - 1; x++) {
+                    // 床の穴の上、またはその直上が壁ではないスペースを探す
+                    if (map[y][x] === 0) {
+                        validX.push(x);
+                    }
+                }
+                if (validX.length > 0) {
+                    let chosenX = validX[Math.floor(Math.random() * validX.length)];
+                    items.push({ x: chosenX, y: y - 1, type: 'flashlight', active: true });
+                }
             }
             
         } else {
+            // 通路層の生成
             map[y] = new Array(COLS).fill(0);
             if (y > 14) {
                 let wallChance = 0.32; 
                 for (let x = 0; x < COLS; x++) {
                     if (Math.random() < wallChance) map[y][x] = 1;
                 }
+                
+                // 【通路層のルート保証】正解ルートの真下とその周囲に絶対岩を置かない
                 if (map[y - 1]) {
                     if (map[y][truePathX] === 1) map[y][truePathX] = 0; 
                     if (truePathX > 0 && map[y][truePathX - 1] === 1) map[y][truePathX - 1] = 0;
                     if (truePathX < COLS - 1 && map[y][truePathX + 1] === 1) map[y][truePathX + 1] = 0;
 
+                    // 孤立した落とし穴（下に岩があって詰む場所）を自動救済
                     for(let x = 0; x < COLS; x++) {
                         if (map[y - 1][x] === 0 && map[y][x] === 1) map[y][x] = 0;
                     }
@@ -459,7 +471,6 @@ function update() {
     if ((map[nextGridY] && map[nextGridY][pLeftX] === 1) || (map[nextGridY] && map[nextGridY][pRightX] === 1)) {
         standOnFloor = true;
     }
-    // 100mの床設置時、穴(0)以外を踏んでいるなら着地する
     if (nextGridY === 200 && map[200] && map[200][player.x] === 1) standOnFloor = true;
     if (nextGridY === 600) {
         standOnFloor = true;
@@ -491,6 +502,7 @@ function update() {
         if (!collision) player.subX = nextSubX;
     }
 
+    // アイテム獲得処理（岩に埋まらない前提なので位置の完全一致で確実に拾えます）
     items.forEach(item => {
         if (item.active && item.y === player.y && item.x === player.x) {
             if (item.type === 'flashlight') { item.active = false; player.flashlightTimer = 300; }
@@ -504,7 +516,7 @@ function update() {
         document.getElementById('ui-depth').innerText = player.maxDepth;
     }
 
-    // 行き止まりスタック判定（100m地点 y=200 は特殊通路のため判定から除外して絶対に詰まらないようにする）
+    // 行き止まり判定
     let isStuck = false;
     if (!player.isFalling && player.y !== 199 && player.y !== 200 && player.y < 598) {
         let currentY = Math.floor(player.subY / TILE_SIZE);
