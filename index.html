@@ -155,7 +155,6 @@
             font-family: monospace;
         }
 
-        /* 横スクロール型のスタイリッシュなキャラ選択UI */
         .char-selector-title {
             font-size: 12px;
             color: #ffd700;
@@ -249,9 +248,7 @@
         <p>正解ルートを見極め、300mの最深部を目指せ！<br>50m潜るごとに、視界の広い新調査員が覚醒する。</p>
         
         <div class="char-selector-title">EXPLORER SELECT</div>
-        <div class="char-scroll-box" id="char-container">
-            <!-- JavaScriptで動的にカードを生成 -->
-        </div>
+        <div class="char-scroll-box" id="char-container"></div>
 
         <button id="start-button">START GAME</button>
         <div style="font-size: 10px; color:#666; margin-top:8px;">[PCの方はEnterキーでもスタート可能]</div>
@@ -273,7 +270,7 @@
     <div id="screen-clear" class="overlay hidden">
         <h1 style="color:#ffd700; text-shadow: 0 0 15px #ffd700;">STAGE CLEAR!</h1>
         <div style="font-size: 50px; margin: 15px 0;">👑</div>
-        <p>300mの最深部に到達し、伝説の宝箱を開けた！<br>おめでとうございます！</p>
+        <p>300mの最深部に到達し、伝説 of 宝箱を開けた！<br>おめでとうございます！</p>
         <button id="clear-home-button">HOME TO TITLE</button>
         <div style="font-size: 11px; color:#777; margin-top:12px;">[PC: Enterキーでホームへ戻る]</div>
     </div>
@@ -291,7 +288,6 @@ let items = [];
 let generatedMaxY = 0;      
 let truePathX = 10; 
 
-// キャラクターデータ定義（50mごとに10%ずつ視野拡大）
 const CHARACTERS = [
     { id: 'yellow', name: 'イエロー', color: '#fff700', req: 0, scale: 1.0 },
     { id: 'aqua', name: 'アクア', color: '#00e5ff', req: 50, scale: 1.1 },
@@ -302,9 +298,9 @@ const CHARACTERS = [
     { id: 'rainbow', name: 'プリズム', color: '#ffffff', req: 300, scale: 1.6 }
 ];
 
-let activeCharId = localStorage.getItem('deepDrop_activeChar_v9') || 'yellow';
-let clearCount = parseInt(localStorage.getItem('deepDrop_clears_v9')) || 0;
-let highScore = parseInt(localStorage.getItem('deepDrop_high_v9')) || 0;
+let activeCharId = localStorage.getItem('deepDrop_activeChar_v10') || 'yellow';
+let clearCount = parseInt(localStorage.getItem('deepDrop_clears_v10')) || 0;
+let highScore = parseInt(localStorage.getItem('deepDrop_high_v10')) || 0;
 
 let player = {
     x: 10, y: 2,            
@@ -341,7 +337,7 @@ function initMap() {
         map[y] = new Array(COLS).fill(0);
     }
     generatedMaxY = 10;
-    extendMap(110); 
+    extendMap(120); 
     
     player.x = 10;
     player.y = 2;
@@ -355,16 +351,23 @@ function extendMap(targetRows) {
     while (generatedMaxY < targetRows) {
         let y = generatedMaxY;
         
-        // 100m中継フロアの保証
+        // --- 【バグ修正】100m中継フロアのスタック防止対策 ---
         if (y === 200) {
-            map[y] = new Array(COLS).fill(1);
-            map[y][truePathX] = 1; 
-            map[y-1] = new Array(COLS).fill(0);
+            map[y] = new Array(COLS).fill(1); // 全体に床を敷く
+            // 中央付近(10マス目)を次の階層へ進む「確定の脱出穴」として空ける
+            truePathX = 10;
+            map[y][truePathX] = 0; 
+            generatedMaxY++;
+            continue;
+        }
+        if (y === 199) {
+            // 100m直前が壁で埋まらないように空気にするが、プレイヤーを誘導するため仕切り壁はなし
+            map[y] = new Array(COLS).fill(0);
             generatedMaxY++;
             continue;
         }
 
-        // 300m最終ゴールの完全保護
+        // 300mゴールの完全保護
         if (y === 600) {
             map[y] = new Array(COLS).fill(1);
             map[y][10] = 1; 
@@ -386,14 +389,12 @@ function extendMap(targetRows) {
             truePathX = Math.max(1, Math.min(COLS - 2, truePathX + drift));
             map[y][truePathX] = 0; 
 
-            // 罠穴生成
             let totalHoles = Math.floor(Math.random() * 2) + 4; 
             for (let i = 0; i < totalHoles; i++) {
                 let fakeX = Math.floor(Math.random() * (COLS - 2)) + 1;
                 if (fakeX !== truePathX) map[y][fakeX] = 0; 
             }
             
-            // アイテム配置
             if (y > 12 && Math.random() < 0.12) {
                 let itemX = truePathX;
                 if (Math.random() < 0.5 && truePathX > 0) itemX = truePathX - 1;
@@ -458,7 +459,8 @@ function update() {
     if ((map[nextGridY] && map[nextGridY][pLeftX] === 1) || (map[nextGridY] && map[nextGridY][pRightX] === 1)) {
         standOnFloor = true;
     }
-    if (nextGridY === 200) standOnFloor = true;
+    // 100mの床設置時、穴(0)以外を踏んでいるなら着地する
+    if (nextGridY === 200 && map[200] && map[200][player.x] === 1) standOnFloor = true;
     if (nextGridY === 600) {
         standOnFloor = true;
         player.subY = 599 * TILE_SIZE;
@@ -502,8 +504,9 @@ function update() {
         document.getElementById('ui-depth').innerText = player.maxDepth;
     }
 
+    // 行き止まりスタック判定（100m地点 y=200 は特殊通路のため判定から除外して絶対に詰まらないようにする）
     let isStuck = false;
-    if (!player.isFalling && player.y < 198 && player.y < 598) {
+    if (!player.isFalling && player.y !== 199 && player.y !== 200 && player.y < 598) {
         let currentY = Math.floor(player.subY / TILE_SIZE);
         let currentX = Math.floor((player.subX + player.width / 2) / TILE_SIZE);
         let floorY = currentY + 1;
@@ -543,7 +546,6 @@ function draw() {
     let startRow = Math.floor(cameraY / TILE_SIZE);
     let endRow = startRow + VIEW_ROWS + 2;
 
-    // 背景意匠パーツ
     function drawBiomeIcon(iconX, iconY, type, alpha) {
         ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.35})`;
         if (type === 'ice') {
@@ -618,11 +620,9 @@ function draw() {
         }
     });
 
-    // 選択中の調査員カラーを取得
     let activeChar = CHARACTERS.find(c => c.id === activeCharId) || CHARACTERS[0];
     let charColor = activeChar.color;
 
-    // レインボー（プリズム）用エフェクト
     if (activeChar.id === 'rainbow') {
         let hue = (Date.now() / 15) % 360;
         charColor = `hsl(${hue}, 100%, 65%)`;
@@ -647,7 +647,6 @@ function draw() {
 
     ctx.restore();
 
-    // 視野霧のサイズ調整（キャラクター性能反映）
     let screenPlayerY = player.subY + TILE_SIZE/2 - cameraY;
     let screenPlayerX = player.subX + player.width/2;
     let viewRadiusStart = TILE_SIZE * 1.5 * activeChar.scale;
@@ -668,7 +667,6 @@ function draw() {
     }
 }
 
-// 50mごとの報酬キャラ選択UIを動的に書き出す
 function renderCharacterSelector() {
     let container = document.getElementById('char-container');
     container.innerHTML = '';
@@ -704,7 +702,7 @@ function renderCharacterSelector() {
             card.addEventListener('click', () => {
                 if (gameState === 'START') {
                     activeCharId = c.id;
-                    localStorage.setItem('deepDrop_activeChar_v9', activeCharId);
+                    localStorage.setItem('deepDrop_activeChar_v10', activeCharId);
                     renderCharacterSelector();
                     draw();
                 }
@@ -738,11 +736,10 @@ function endGame() {
     gameState = 'GAMEOVER';
     document.getElementById('result-depth').innerText = player.maxDepth;
     
-    // 直前の最高スコアを上回る新エリア到達で新キャラアンロック演出
     let oldHighScore = highScore;
     if (player.maxDepth > highScore) {
         highScore = player.maxDepth;
-        localStorage.setItem('deepDrop_high_v9', highScore);
+        localStorage.setItem('deepDrop_high_v10', highScore);
         document.getElementById('ui-high').innerText = highScore;
     }
 
@@ -760,10 +757,10 @@ function endGame() {
 function clearGame() {
     gameState = 'CLEAR';
     clearCount++;
-    localStorage.setItem('deepDrop_clears_v9', clearCount);
+    localStorage.setItem('deepDrop_clears_v10', clearCount);
     if (highScore < 300) {
         highScore = 300;
-        localStorage.setItem('deepDrop_high_v9', 300);
+        localStorage.setItem('deepDrop_high_v10', 300);
         document.getElementById('ui-high').innerText = 300;
     }
     document.getElementById('screen-clear').classList.remove('hidden');
@@ -789,19 +786,11 @@ function returnToHome() {
     draw();
 }
 
-// PC操作キーイベント（左右移動 ＆ Enterキー操作）
 window.addEventListener('keydown', e => {
     keys[e.key] = true;
-    
-    // ゲームオーバー画面、スタート画面、クリア画面でのEnterキーのハンドリング
     if (e.key === 'Enter') {
-        if (gameState === 'START') {
-            startGame();
-        } else if (gameState === 'GAMEOVER') {
-            startGame();
-        } else if (gameState === 'CLEAR') {
-            returnToHome();
-        }
+        if (gameState === 'START' || gameState === 'GAMEOVER') startGame();
+        else if (gameState === 'CLEAR') returnToHome();
     }
 });
 window.addEventListener('keyup', e => keys[e.key] = false);
@@ -817,7 +806,7 @@ document.getElementById('btn-right').addEventListener('touchend', () => mobileRi
 document.getElementById('btn-left').addEventListener('mousedown', () => mobileLeftPressed = true);
 document.getElementById('btn-left').addEventListener('mouseup', () => mobileLeftPressed = false);
 document.getElementById('btn-right').addEventListener('mousedown', () => mobileRightPressed = true);
-document.getElementById('btn-right').addEventListener('mouseup', () => mobileRightPressed = false);
+document.getElementById('btn-mouseup', () => mobileRightPressed = false);
 
 document.getElementById('start-button').addEventListener('click', startGame);
 document.getElementById('restart-button').addEventListener('click', startGame);
